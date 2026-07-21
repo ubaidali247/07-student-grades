@@ -1,5 +1,5 @@
-// CRUD Tests - Student Grades
-describe('CRUD Operations - Student Grades', () => {
+// CRUD Tests - 07 Student Grades
+describe('CRUD Operations - 07 Student Grades', () => {
   beforeEach(() => {
     cy.visit('/');
     cy.get('.nav-link[data-page="students"]').click();
@@ -105,7 +105,7 @@ describe('CRUD Operations - Student Grades', () => {
     cy.request({
       method: 'POST',
       url: '/api/students',
-      body: {"title":"Test Assignment","name":"Test Student","studentId":"STU9999","course":"Computer Science","grade":"A","semester":"Semester 1","notes":"Excellent work"},
+      body: {"title": "Test Assignment", "name": "Test Student", "studentId": "STU9999", "course": "Computer Science", "grade": "A", "semester": "Semester 1", "notes": "Good"},
     }).its('status').should('eq', 201);
   });
 
