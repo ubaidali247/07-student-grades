@@ -13,42 +13,24 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
 
 // ============================================================
-// FLAKINESS INJECTION LAYER
-// Controls which endpoints behave unreliably and how often
-// Used for: MSc Dissertation - AI-Assisted Flaky Test Detection
+// FLAKINESS INJECTION LAYER v2
+// MSc Dissertation - AI-Assisted Flaky Test Detection
+// Probabilities tuned for ~30-40% failure rate
 // ============================================================
 const FLAKY_CONFIG = {
   enabled: true,
-  slowEndpoints: ['/api/students', '/api/students/:id'],  // GET endpoints that randomly slow down
-  errorEndpoints: ['/api/students'],                       // POST endpoint that randomly errors
-  slowProbability: 0.35,    // 35% chance of slow response
-  errorProbability: 0.25,   // 25% chance of server error on POST
-  slowDelayMs: {
-    min: 3000,
-    max: 8000
-  }
+  slowProbability: 0.30,   // 30% chance of slow GET response
+  errorProbability: 0.20,  // 20% chance of 500 on POST
+  slowDelayMs: { min: 2000, max: 4500 }  // Below Cypress 8s timeout but enough to cause issues
 };
 
 function randomDelay(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-function shouldBeFlaky(probability) {
-  return FLAKY_CONFIG.enabled && Math.random() < probability;
+function shouldBeFlaky(prob) {
+  return FLAKY_CONFIG.enabled && Math.random() < prob;
 }
-
-// Flakiness middleware for GET /api/students
-function flakyGetMiddleware(req, res, next) {
-  if (shouldBeFlaky(FLAKY_CONFIG.slowProbability)) {
-    const delay = randomDelay(FLAKY_CONFIG.slowDelayMs.min, FLAKY_CONFIG.slowDelayMs.max);
-    console.log(`[FLAKY] Injecting ${delay}ms delay on GET /api/students`);
-    setTimeout(next, delay);
-  } else {
-    next();
-  }
-}
-
-// ============================================================
 
 function readDB() {
   if (!fs.existsSync(DB_PATH)) {
@@ -153,44 +135,38 @@ function seedIfEmpty() {
 }
 seedIfEmpty();
 
-// GET all - with flakiness injection
-app.get('/api/students', flakyGetMiddleware, (req, res) => {
-  const db = readDB();
-  let items = db.students;
-  if (req.query.search) {
-    const q = req.query.search.toLowerCase();
-    items = items.filter(i => (i.title && i.title.toLowerCase().includes(q)) || (i.name && i.name.toLowerCase().includes(q)));
-  }
-  if (req.query.category) {
-    items = items.filter(i => i.category === req.query.category);
-  }
-  res.json(items);
-});
-
-// GET one - with flakiness injection
-app.get('/api/students/:id', (req, res) => {
-  if (shouldBeFlaky(FLAKY_CONFIG.slowProbability * 0.5)) {
-    const delay = randomDelay(2000, 5000);
-    console.log(`[FLAKY] Injecting ${delay}ms delay on GET /api/students/${req.params.id}`);
-    setTimeout(() => {
-      const db = readDB();
-      const item = db.students.find(i => i.id === req.params.id);
-      if (!item) return res.status(404).json({ error: 'Not found' });
-      res.json(item);
-    }, delay);
-  } else {
+// GET all - 30% chance of slow response
+app.get('/api/students', (req, res) => {
+  const handler = () => {
     const db = readDB();
-    const item = db.students.find(i => i.id === req.params.id);
-    if (!item) return res.status(404).json({ error: 'Not found' });
-    res.json(item);
-  }
+    let items = db.students;
+    if (req.query.search) {
+      const q = req.query.search.toLowerCase();
+      items = items.filter(i => (i.title && i.title.toLowerCase().includes(q)) || (i.name && i.name.toLowerCase().includes(q)));
+    }
+    if (req.query.category) items = items.filter(i => i.category === req.query.category);
+    res.json(items);
+  };
+  if (shouldBeFlaky(FLAKY_CONFIG.slowProbability)) {
+    const delay = randomDelay(FLAKY_CONFIG.slowDelayMs.min, FLAKY_CONFIG.slowDelayMs.max);
+    console.log(`[FLAKY] Slow GET /api/students +${delay}ms`);
+    setTimeout(handler, delay);
+  } else { handler(); }
 });
 
-// POST create - with flakiness injection (random 500 errors)
+// GET one
+app.get('/api/students/:id', (req, res) => {
+  const db = readDB();
+  const item = db.students.find(i => i.id === req.params.id);
+  if (!item) return res.status(404).json({ error: 'Not found' });
+  res.json(item);
+});
+
+// POST - 20% chance of 500 error
 app.post('/api/students', (req, res) => {
   if (shouldBeFlaky(FLAKY_CONFIG.errorProbability)) {
-    console.log(`[FLAKY] Injecting 500 error on POST /api/students`);
-    return res.status(500).json({ error: 'Internal server error - flaky injection' });
+    console.log(`[FLAKY] 500 error on POST /api/students`);
+    return res.status(500).json({ error: 'Flaky server error - injected for research' });
   }
   const db = readDB();
   const item = { id: uuidv4(), ...req.body, createdAt: new Date().toISOString() };
@@ -219,20 +195,16 @@ app.delete('/api/students/:id', (req, res) => {
   res.json({ message: 'Deleted successfully' });
 });
 
-// Reset endpoint for testing
 app.post('/api/reset', (req, res) => {
-  const initial = { students: [] };
-  writeDB(initial);
+  writeDB({ students: [] });
   seedIfEmpty();
-  res.json({ message: 'Database reset' });
+  res.json({ message: 'Reset complete' });
 });
 
-// Health check
 app.get('/api/health', (req, res) => res.json({ status: 'ok', project: 'Student Grades', flakyEnabled: FLAKY_CONFIG.enabled }));
 
-// Serve frontend
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'frontend', 'index.html'));
 });
 
-app.listen(PORT, () => console.log('Student Grades server running on http://localhost:3007 [FLAKY MODE: ' + FLAKY_CONFIG.enabled + ']'));
+app.listen(PORT, () => console.log('Student Grades running on http://localhost:3007 [FLAKY v2]'));

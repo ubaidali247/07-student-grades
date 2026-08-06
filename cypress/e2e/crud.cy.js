@@ -1,7 +1,6 @@
 // CRUD Tests - Student Grades
-// NOTE: Tests marked [FLAKY-INJECTED] are deliberately made unstable
-// for MSc dissertation research on AI-assisted flaky test detection.
-// Flakiness type: timing-based (random waits) and state-based (race conditions)
+// [FLAKY-INJECTED] tests are deliberately unstable (~30-40% failure rate)
+// MSc Dissertation: AI-Assisted Flaky Test Detection in CI/CD Pipelines
 
 describe('CRUD Operations - Student Grades', () => {
   beforeEach(() => {
@@ -15,14 +14,12 @@ describe('CRUD Operations - Student Grades', () => {
     cy.get('#students-list .item-card').should('have.length.gte', 1);
   });
 
-  // [FLAKY-INJECTED] timing: random wait before checking list renders
+  // [FLAKY-INJECTED] backend slow response causes list not to load in time
   it('creates a new item successfully', () => {
     cy.get('#btn-add-new').click();
     cy.get('#field-title').type('Test Assignment');
     cy.get('#field-description, #field-content, #field-review, #field-notes').first().type('Test description for new item');
     cy.get('#btn-submit').click();
-    // Flakiness: random delay simulates slow DOM re-render after submission
-    cy.wait(Math.random() < 0.4 ? 6000 : 500);
     cy.get('#page-students').should('not.have.class', 'hidden');
     cy.get('#students-list').should('contain', 'Test Assignment');
   });
@@ -57,11 +54,8 @@ describe('CRUD Operations - Student Grades', () => {
     cy.get('#btn-back').should('be.visible');
   });
 
-  // [FLAKY-INJECTED] timing: race condition between navigation and DOM update
   it('detail page has edit button', () => {
     cy.get('#students-list .item-card').first().find('.btn-view').click();
-    // Flakiness: intermittent wait causes element check before page fully renders
-    if (Math.random() < 0.35) { cy.wait(5000); }
     cy.get('#btn-edit').should('be.visible');
   });
 
@@ -87,13 +81,10 @@ describe('CRUD Operations - Student Grades', () => {
     cy.get('#field-title').invoke('val').should('not.be.empty');
   });
 
-  // [FLAKY-INJECTED] timing: slow re-render after update submission
   it('can update an existing item', () => {
     cy.get('#students-list .item-card').first().find('.btn-edit-card').click();
     cy.get('#field-title').clear().type('Updated Assignment');
     cy.get('#btn-submit').click();
-    // Flakiness: random delay causes list check before update propagates
-    cy.wait(Math.random() < 0.4 ? 5500 : 300);
     cy.get('#students-list').should('contain', 'Updated Assignment');
   });
 
@@ -115,7 +106,7 @@ describe('CRUD Operations - Student Grades', () => {
     cy.request('/api/students').its('body').should('be.an', 'array');
   });
 
-  // [FLAKY-INJECTED] backend: random 500 errors from POST endpoint
+  // [FLAKY-INJECTED] backend randomly returns 500 on POST ~20% of runs
   it('api create endpoint returns 201', () => {
     cy.request({
       method: 'POST',
@@ -123,7 +114,6 @@ describe('CRUD Operations - Student Grades', () => {
       body: {"title":"Test Assignment","name":"Test Student","studentId":"STU9999","course":"Computer Science","grade":"A","semester":"Semester 1","notes":"Good"},
       failOnStatusCode: false,
     }).then(res => {
-      // Flakiness: backend randomly returns 500, causing this assertion to fail
       expect(res.status).to.eq(201);
     });
   });
