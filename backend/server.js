@@ -12,6 +12,44 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
 
+// ============================================================
+// FLAKINESS INJECTION LAYER
+// Controls which endpoints behave unreliably and how often
+// Used for: MSc Dissertation - AI-Assisted Flaky Test Detection
+// ============================================================
+const FLAKY_CONFIG = {
+  enabled: true,
+  slowEndpoints: ['/api/students', '/api/students/:id'],  // GET endpoints that randomly slow down
+  errorEndpoints: ['/api/students'],                       // POST endpoint that randomly errors
+  slowProbability: 0.35,    // 35% chance of slow response
+  errorProbability: 0.25,   // 25% chance of server error on POST
+  slowDelayMs: {
+    min: 3000,
+    max: 8000
+  }
+};
+
+function randomDelay(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function shouldBeFlaky(probability) {
+  return FLAKY_CONFIG.enabled && Math.random() < probability;
+}
+
+// Flakiness middleware for GET /api/students
+function flakyGetMiddleware(req, res, next) {
+  if (shouldBeFlaky(FLAKY_CONFIG.slowProbability)) {
+    const delay = randomDelay(FLAKY_CONFIG.slowDelayMs.min, FLAKY_CONFIG.slowDelayMs.max);
+    console.log(`[FLAKY] Injecting ${delay}ms delay on GET /api/students`);
+    setTimeout(next, delay);
+  } else {
+    next();
+  }
+}
+
+// ============================================================
+
 function readDB() {
   if (!fs.existsSync(DB_PATH)) {
     const initial = { students: [] };
@@ -25,98 +63,89 @@ function writeDB(data) {
   fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2));
 }
 
-// Seed data if empty
 function seedIfEmpty() {
   const db = readDB();
   if (db.students.length === 0) {
     db.students = [
     {
         "id": "seed-1",
-        "title": "Mathematics Grade",
-        "description": "Sample description for Mathematics Grade. This is test data for the flaky test detection research study.",
+        "title": "Mathematics Assignment",
+        "description": "Sample description for research study item 1.",
         "category": "Mathematics",
-        "createdAt": "2026-07-21T00:21:18.623Z",
+        "createdAt": "2024-01-01T10:00:00.000Z",
         "name": "Alice",
         "studentId": "STU1000",
-        "grade": "A",
-        "semester": "Semester 1"
+        "grade": "A"
     },
     {
         "id": "seed-2",
         "title": "Science Report",
-        "description": "Sample description for Science Report. This is test data for the flaky test detection research study.",
+        "description": "Sample description for research study item 2.",
         "category": "Science",
-        "createdAt": "2026-07-20T00:21:18.623Z",
+        "createdAt": "2024-02-02T10:00:00.000Z",
         "name": "Bob",
         "studentId": "STU1001",
-        "grade": "B+",
-        "semester": "Semester 2"
+        "grade": "B+"
     },
     {
         "id": "seed-3",
         "title": "English Essay",
-        "description": "Sample description for English Essay. This is test data for the flaky test detection research study.",
+        "description": "Sample description for research study item 3.",
         "category": "English",
-        "createdAt": "2026-07-19T00:21:18.623Z",
+        "createdAt": "2024-03-03T10:00:00.000Z",
         "name": "Carol",
         "studentId": "STU1002",
-        "grade": "B",
-        "semester": "Semester 1"
+        "grade": "B"
     },
     {
         "id": "seed-4",
         "title": "History Assignment",
-        "description": "Sample description for History Assignment. This is test data for the flaky test detection research study.",
+        "description": "Sample description for research study item 4.",
         "category": "History",
-        "createdAt": "2026-07-18T00:21:18.623Z",
+        "createdAt": "2024-04-04T10:00:00.000Z",
         "name": "David",
         "studentId": "STU1003",
-        "grade": "C+",
-        "semester": "Semester 2"
+        "grade": "C+"
     },
     {
         "id": "seed-5",
         "title": "CS Project",
-        "description": "Sample description for CS Project. This is test data for the flaky test detection research study.",
-        "category": "Computer Science",
-        "createdAt": "2026-07-17T00:21:18.623Z",
+        "description": "Sample description for research study item 5.",
+        "category": "Mathematics",
+        "createdAt": "2024-05-05T10:00:00.000Z",
         "name": "Emma",
         "studentId": "STU1004",
-        "grade": "A-",
-        "semester": "Semester 1"
+        "grade": "A-"
     },
     {
         "id": "seed-6",
         "title": "Physics Lab",
-        "description": "Sample description for Physics Lab. This is test data for the flaky test detection research study.",
-        "category": "Mathematics",
-        "createdAt": "2026-07-16T00:21:18.623Z",
+        "description": "Sample description for research study item 6.",
+        "category": "Science",
+        "createdAt": "2024-06-06T10:00:00.000Z",
         "name": "Frank",
         "studentId": "STU1005",
-        "grade": "A",
-        "semester": "Semester 2"
+        "grade": "A"
     },
     {
         "id": "seed-7",
         "title": "Chemistry Test",
-        "description": "Sample description for Chemistry Test. This is test data for the flaky test detection research study.",
-        "category": "Science",
-        "createdAt": "2026-07-15T00:21:18.623Z",
+        "description": "Sample description for research study item 7.",
+        "category": "English",
+        "createdAt": "2024-07-07T10:00:00.000Z",
         "name": "Grace",
         "studentId": "STU1006",
-        "grade": "B+",
-        "semester": "Semester 1"
+        "grade": "B+"
     },
     {
         "id": "seed-8",
         "title": "Art Portfolio",
-        "description": "Sample description for Art Portfolio. This is test data for the flaky test detection research study.",
-        "category": "English",
-        "createdAt": "2026-07-14T00:21:18.623Z",
+        "description": "Sample description for research study item 8.",
+        "category": "History",
+        "createdAt": "2024-08-08T10:00:00.000Z",
         "name": "Henry",
         "studentId": "STU1007",
-        "grade": "B",
-        "semester": "Semester 2"
+        "grade": "B"
     }
 ];
     writeDB(db);
@@ -124,13 +153,13 @@ function seedIfEmpty() {
 }
 seedIfEmpty();
 
-// GET all
-app.get('/api/students', (req, res) => {
+// GET all - with flakiness injection
+app.get('/api/students', flakyGetMiddleware, (req, res) => {
   const db = readDB();
   let items = db.students;
   if (req.query.search) {
     const q = req.query.search.toLowerCase();
-    items = items.filter(i => i.title && i.title.toLowerCase().includes(q) || (i.name && i.name.toLowerCase().includes(q)));
+    items = items.filter(i => (i.title && i.title.toLowerCase().includes(q)) || (i.name && i.name.toLowerCase().includes(q)));
   }
   if (req.query.category) {
     items = items.filter(i => i.category === req.query.category);
@@ -138,16 +167,31 @@ app.get('/api/students', (req, res) => {
   res.json(items);
 });
 
-// GET one
+// GET one - with flakiness injection
 app.get('/api/students/:id', (req, res) => {
-  const db = readDB();
-  const item = db.students.find(i => i.id === req.params.id);
-  if (!item) return res.status(404).json({ error: 'Not found' });
-  res.json(item);
+  if (shouldBeFlaky(FLAKY_CONFIG.slowProbability * 0.5)) {
+    const delay = randomDelay(2000, 5000);
+    console.log(`[FLAKY] Injecting ${delay}ms delay on GET /api/students/${req.params.id}`);
+    setTimeout(() => {
+      const db = readDB();
+      const item = db.students.find(i => i.id === req.params.id);
+      if (!item) return res.status(404).json({ error: 'Not found' });
+      res.json(item);
+    }, delay);
+  } else {
+    const db = readDB();
+    const item = db.students.find(i => i.id === req.params.id);
+    if (!item) return res.status(404).json({ error: 'Not found' });
+    res.json(item);
+  }
 });
 
-// POST create
+// POST create - with flakiness injection (random 500 errors)
 app.post('/api/students', (req, res) => {
+  if (shouldBeFlaky(FLAKY_CONFIG.errorProbability)) {
+    console.log(`[FLAKY] Injecting 500 error on POST /api/students`);
+    return res.status(500).json({ error: 'Internal server error - flaky injection' });
+  }
   const db = readDB();
   const item = { id: uuidv4(), ...req.body, createdAt: new Date().toISOString() };
   db.students.push(item);
@@ -184,11 +228,11 @@ app.post('/api/reset', (req, res) => {
 });
 
 // Health check
-app.get('/api/health', (req, res) => res.json({ status: 'ok', project: 'Student Grades' }));
+app.get('/api/health', (req, res) => res.json({ status: 'ok', project: 'Student Grades', flakyEnabled: FLAKY_CONFIG.enabled }));
 
 // Serve frontend
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'frontend', 'index.html'));
 });
 
-app.listen(PORT, () => console.log('Student Grades server running on http://localhost:3007'));
+app.listen(PORT, () => console.log('Student Grades server running on http://localhost:3007 [FLAKY MODE: ' + FLAKY_CONFIG.enabled + ']'));
